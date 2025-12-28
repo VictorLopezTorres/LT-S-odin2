@@ -136,6 +136,7 @@ ADSRComponent::GraphGeometry ADSRComponent::getGraphGeometry() {
 
 void ADSRComponent::paint(juce::Graphics& g) {
 	g.fillAll(juce::Colour::fromString("#202020"));
+    g.reduceClipRegion(getLocalBounds());
     auto geo = getGraphGeometry();
 
 	juce::Path p;
@@ -295,6 +296,7 @@ void ADSRComponent::mouseDown(const juce::MouseEvent& e) {
     } else {
         m_draggedHandle = -1;
     }
+    repaint();
 }
 
 void ADSRComponent::mouseDrag(const juce::MouseEvent& e) {
