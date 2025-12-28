@@ -1,0 +1,29 @@
+name: Build Windows
+
+on:
+  push:
+    branches: [ "master", "devel" ]
+  pull_request:
+    branches: [ "master", "devel" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Configure CMake
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Release -D ODIN2_COPY_PLUGIN_AFTER_BUILD=OFF
+
+    - name: Build
+      run: cmake --build build --config Release
+
+    - name: Upload VST3 Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Odin2-VST3-Windows
+        path: build/Odin2_artefacts/Release/VST3/Odin2.vst3
