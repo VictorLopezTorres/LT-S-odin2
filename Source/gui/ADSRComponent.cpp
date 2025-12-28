@@ -33,6 +33,7 @@ ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::strin
     m_sustain_label("S"),
     m_release_label("R") {
 
+    setOpaque(true);
 	setWantsKeyboardFocus(false);
 
 	addAndMakeVisible(m_attack_label);
@@ -134,7 +135,7 @@ ADSRComponent::GraphGeometry ADSRComponent::getGraphGeometry() {
 }
 
 void ADSRComponent::paint(juce::Graphics& g) {
-	g.fillAll(juce::Colour::fromString("#1f1f1f"));
+	g.fillAll(juce::Colour::fromString("#202020"));
     auto geo = getGraphGeometry();
 
 	juce::Path p;
@@ -192,26 +193,26 @@ void ADSRComponent::paint(juce::Graphics& g) {
 
     g.restoreState();
 
-    if (m_activeParameterIndex != -1) {
+    if (m_draggedHandle != -1) {
         g.setColour(juce::Colours::white);
         g.setFont(14.0f);
 
         juce::String text;
         float x = 0, y = 0;
 
-        if (m_activeParameterIndex == 0) { // Attack
+        if (m_draggedHandle == 0) { // Attack
             text = m_attack.getTextFromValue(m_attack.getValue());
             x = geo.xAttack;
             y = geo.yPeak + 20;
-        } else if (m_activeParameterIndex == 1) { // Decay
+        } else if (m_draggedHandle == 1) { // Decay
             text = m_decay.getTextFromValue(m_decay.getValue());
             x = geo.xDecay;
             y = (geo.ySustain < 30) ? geo.ySustain + 20 : geo.ySustain - 20;
-        } else if (m_activeParameterIndex == 2) { // Sustain
+        } else if (m_draggedHandle == 2) { // Sustain
             text = m_sustain.getTextFromValue(m_sustain.getValue());
             x = geo.xDecay;
             y = (geo.ySustain < 30) ? geo.ySustain + 20 : geo.ySustain - 20;
-        } else if (m_activeParameterIndex == 3) { // Release
+        } else if (m_draggedHandle == 3) { // Release
             text = m_release.getTextFromValue(m_release.getValue());
             x = geo.xRelease;
             y = geo.yBase - 20;
@@ -286,13 +287,13 @@ void ADSRComponent::mouseDown(const juce::MouseEvent& e) {
     }
 
     if (m_dragged_handle == AttackPeak) {
-        m_activeParameterIndex = 0;
+        m_draggedHandle = 0;
     } else if (m_dragged_handle == DecayEnd) {
-        m_activeParameterIndex = 2; // Default to Sustain
+        m_draggedHandle = 2; // Default to Sustain
     } else if (m_dragged_handle == ReleaseEnd) {
-        m_activeParameterIndex = 3;
+        m_draggedHandle = 3;
     } else {
-        m_activeParameterIndex = -1;
+        m_draggedHandle = -1;
     }
 }
 
@@ -302,9 +303,9 @@ void ADSRComponent::mouseDrag(const juce::MouseEvent& e) {
     if (m_dragged_handle == DecayEnd) {
         juce::Point<float> startPos = e.getMouseDownPosition().toFloat();
         if (std::abs(e.position.x - startPos.x) > std::abs(e.position.y - startPos.y)) {
-             m_activeParameterIndex = 1; // Decay
+             m_draggedHandle = 1; // Decay
         } else {
-             m_activeParameterIndex = 2; // Sustain
+             m_draggedHandle = 2; // Sustain
         }
     }
 
@@ -374,11 +375,11 @@ void ADSRComponent::mouseDrag(const juce::MouseEvent& e) {
 
 void ADSRComponent::mouseUp(const juce::MouseEvent& e) {
     m_dragged_handle = None;
-    m_activeParameterIndex = -1;
+    m_draggedHandle = -1;
     repaint();
 }
 
 void ADSRComponent::mouseExit(const juce::MouseEvent& e) {
-    m_activeParameterIndex = -1;
+    m_draggedHandle = -1;
     repaint();
 }
