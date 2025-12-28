@@ -33,6 +33,8 @@ ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::strin
     m_sustain_label("S"),
     m_release_label("R") {
 
+	setWantsKeyboardFocus(false);
+
 	addAndMakeVisible(m_attack_label);
 	addAndMakeVisible(m_decay_label);
 	addAndMakeVisible(m_sustain_label);
@@ -56,17 +58,24 @@ ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::strin
 	addAndMakeVisible(m_release);
 
 	m_attack.setRange(A_LOW_LIMIT, A_HIGH_LIMIT);
+	m_attack.setSkewFactorFromMidPoint(A_MID_VALUE);
 	m_attack.setTooltip("Attack\nDefines how long the envelope\ntakes to reach the top peak");
 	m_attack.setTextValueSuffix(" s");
 
+	m_decay.setRange(D_LOW_LIMIT, D_HIGH_LIMIT);
+	m_decay.setSkewFactorFromMidPoint(D_MID_VALUE);
 	m_decay.setTextValueSuffix(" s");
 	m_decay.setTooltip("Decay\nDefines how long the\n envelope takes to fall "
 	                   "from the top\n peak to the sustain level");
 
+	m_sustain.setRange(S_LOW_LIMIT, S_HIGH_LIMIT);
+	m_sustain.setSkewFactorFromMidPoint(S_MID_VALUE);
 	m_sustain.setNumDecimalPlacesToDisplay(3);
 	m_sustain.setTooltip("Sustain\nDefines the height of the evelope\nafter the "
 	                     "decay section is finished");
 
+	m_release.setRange(R_LOW_LIMIT, R_HIGH_LIMIT);
+	m_release.setSkewFactorFromMidPoint(R_MID_VALUE);
 	m_release.setTextValueSuffix(" s");
 	m_release.setTooltip("Release\nDefines how long the envelope takes\n to fall "
 	                     "back to zero after\nthe key is released");
@@ -125,6 +134,7 @@ ADSRComponent::GraphGeometry ADSRComponent::getGraphGeometry() {
 }
 
 void ADSRComponent::paint(juce::Graphics& g) {
+	g.fillAll(juce::Colour::fromString("#212121"));
     auto geo = getGraphGeometry();
 
 	juce::Path p;

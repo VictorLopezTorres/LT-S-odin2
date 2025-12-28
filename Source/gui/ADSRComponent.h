@@ -37,7 +37,7 @@
 #define S_MID_VALUE 0.3
 
 #define R_LOW_LIMIT A_LOW_LIMIT
-#define R_HIGH_LIMIT A_HIGH_LIMIT
+#define R_HIGH_LIMIT 5.0
 #define R_DEFAULT 0.03
 #define R_MID_VALUE A_MID_VALUE
 //==============================================================================
