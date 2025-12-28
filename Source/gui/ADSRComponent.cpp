@@ -199,6 +199,38 @@ void ADSRComponent::paint(juce::Graphics& g) {
 	// Draw Stroke
 	g.setColour(juce::Colour::fromString("#8ecae6"));
 	g.strokePath(p, juce::PathStrokeType(2.0f));
+
+	// Draw Tension Handles
+	// Calculate midpoints for Attack, Decay, Release (Quadratic Bezier t=0.5)
+	// M = 0.25*P0 + 0.5*P1 + 0.25*P2
+
+	// Attack Midpoint
+	// P0(xStart, yBase), P1(xStart, yAttack), P2(xAttack, yAttack)
+	float ax = 0.25f * xStart + 0.5f * xStart + 0.25f * xAttack;
+	float ay = 0.25f * yBase + 0.5f * yAttack + 0.25f * yAttack;
+
+	// Decay Midpoint
+	// P0(xAttack, yAttack), P1(xAttack, ySustain), P2(xDecay, ySustain)
+	float dx = 0.25f * xAttack + 0.5f * xAttack + 0.25f * xDecay;
+	float dy = 0.25f * yAttack + 0.5f * ySustain + 0.25f * ySustain;
+
+	// Release Midpoint
+	// P0(xSustain, ySustain), P1(xSustain, yEnd), P2(xRelease, yEnd)
+	float rx = 0.25f * xSustain + 0.5f * xSustain + 0.25f * xRelease;
+	float ry = 0.25f * ySustain + 0.5f * yEnd + 0.25f * yEnd;
+
+	float r = 2.0f; // Radius
+	float d = 4.0f; // Diameter
+
+	g.setColour(juce::Colours::white);
+	g.fillEllipse(ax - r, ay - r, d, d);
+	g.fillEllipse(dx - r, dy - r, d, d);
+	g.fillEllipse(rx - r, ry - r, d, d);
+
+	g.setColour(juce::Colour::fromString("#8ecae6"));
+	g.drawEllipse(ax - r, ay - r, d, d, 1.0f);
+	g.drawEllipse(dx - r, dy - r, d, d, 1.0f);
+	g.drawEllipse(rx - r, ry - r, d, d, 1.0f);
 }
 
 void ADSRComponent::resized() {
