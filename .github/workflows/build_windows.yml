@@ -27,3 +27,9 @@ jobs:
       with:
         name: Odin2-VST3-Windows
         path: build/Odin2_artefacts/Release/VST3/Odin2.vst3
+
+    - name: Upload Standalone Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Odin2-Windows-Standalone
+        path: build/**/*.exe
