@@ -54,8 +54,10 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     void mouseDrag(const juce::MouseEvent& e) override;
     void mouseUp(const juce::MouseEvent& e) override;
+    void mouseExit(const juce::MouseEvent& e) override;
 
 private:
+    int m_activeParameterIndex = -1;
     TextLabel m_attack_label;
     TextLabel m_decay_label;
     TextLabel m_sustain_label;
