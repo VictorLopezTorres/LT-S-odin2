@@ -22,6 +22,10 @@
 //==============================================================================
 ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::string &p_adsr_number) :
     m_loop("loop_button", "", OdinButton::Type::loop),
+    m_attack(OdinKnob::Type::knob_4x4a),
+    m_decay(OdinKnob::Type::knob_4x4a),
+    m_sustain(OdinKnob::Type::knob_4x4a),
+    m_release(OdinKnob::Type::knob_4x4a),
     m_value_tree(vts),
     m_adsr_number(p_adsr_number),
     m_attack_label("A"),
@@ -34,10 +38,10 @@ ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::strin
 	addAndMakeVisible(m_sustain_label);
 	addAndMakeVisible(m_release_label);
 
-	m_attack_attach.reset(new OdinSliderAttachment(m_value_tree, ("env" + m_adsr_number + "_attack"), m_attack));
-	m_decay_attach.reset(new OdinSliderAttachment(m_value_tree, "env" + m_adsr_number + "_decay", m_decay));
-	m_sustain_attach.reset(new OdinSliderAttachment(m_value_tree, "env" + m_adsr_number + "_sustain", m_sustain));
-	m_release_attach.reset(new OdinSliderAttachment(m_value_tree, "env" + m_adsr_number + "_release", m_release));
+	m_attack_attach.reset(new OdinKnobAttachment(m_value_tree, ("env" + m_adsr_number + "_attack"), m_attack));
+	m_decay_attach.reset(new OdinKnobAttachment(m_value_tree, "env" + m_adsr_number + "_decay", m_decay));
+	m_sustain_attach.reset(new OdinKnobAttachment(m_value_tree, "env" + m_adsr_number + "_sustain", m_sustain));
+	m_release_attach.reset(new OdinKnobAttachment(m_value_tree, "env" + m_adsr_number + "_release", m_release));
 
 	m_loop.setClickingTogglesState(true);
 	addAndMakeVisible(m_loop);
@@ -46,13 +50,9 @@ ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::strin
 	m_loop.setColour(juce::DrawableButton::ColourIds::backgroundOnColourId, juce::Colour());
 	m_loop.setTooltip("Loops the envelopes attack\n and decay sections");
 
-	m_attack.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
 	addAndMakeVisible(m_attack);
-	m_decay.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
 	addAndMakeVisible(m_decay);
-	m_sustain.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
 	addAndMakeVisible(m_sustain);
-	m_release.setSliderStyle(juce::Slider::SliderStyle::LinearVertical);
 	addAndMakeVisible(m_release);
 
 	m_attack.setRange(A_LOW_LIMIT, A_HIGH_LIMIT);
@@ -92,105 +92,68 @@ ADSRComponent::ADSRComponent(AudioProcessorValueTreeState &vts, const std::strin
 ADSRComponent::~ADSRComponent() {
 }
 
+ADSRComponent::GraphGeometry ADSRComponent::getGraphGeometry() {
+    auto bounds = getLocalBounds().toFloat();
+    float h = bounds.getHeight();
+    float w = bounds.getWidth();
+    float graphHeight = h * 0.7f;
+
+    juce::Rectangle<float> area(0, 0, w, graphHeight);
+
+    // Read normalized slider values (0.0 to 1.0)
+    double aNorm = m_attack.valueToProportionOfLength(m_attack.getValue());
+    double dNorm = m_decay.valueToProportionOfLength(m_decay.getValue());
+    double sNorm = m_sustain.valueToProportionOfLength(m_sustain.getValue());
+    double rNorm = m_release.valueToProportionOfLength(m_release.getValue());
+
+    float sectionWidth = w / 4.0f;
+
+    float xStart = 0.0f;
+    float yBase = graphHeight;
+    float yPeak = 0.0f;
+
+    float xAttack = xStart + (float)(aNorm * sectionWidth);
+
+    float xDecay = xAttack + (float)(dNorm * sectionWidth);
+    float ySustain = graphHeight - (float)(sNorm * graphHeight);
+
+    float xSustain = xDecay + sectionWidth;
+
+    float xRelease = xSustain + (float)(rNorm * sectionWidth);
+
+    return { area, xStart, xAttack, xDecay, xSustain, xRelease, yBase, yPeak, ySustain };
+}
+
 void ADSRComponent::paint(juce::Graphics& g) {
-	// 3. Visual Style: Fill: #3d80b0 (approx 50% opacity), Stroke: #8ecae6 (2px thickness)
-	// Z-Order: The graph draws on the component background, so it is naturally behind the sliders.
-
-	auto bounds = getLocalBounds().toFloat();
-	float w = bounds.getWidth();
-	float h = bounds.getHeight();
-
-	// 2. Draw the Graph
-	// Read normalized slider values (0.0 to 1.0)
-	double aNorm = m_attack.valueToProportionOfLength(m_attack.getValue());
-	double dNorm = m_decay.valueToProportionOfLength(m_decay.getValue());
-	double sNorm = m_sustain.valueToProportionOfLength(m_sustain.getValue());
-	double rNorm = m_release.valueToProportionOfLength(m_release.getValue());
-
-	// Map to component width/height
-	// We'll divide the width into 4 logical sections for A, D, Sustain, R.
-	// Attack, Decay, Release each take up to 1/4 of the width based on their value.
-	// Sustain takes a fixed 1/4 width (or whatever is left if we were dynamic, but let's be consistent).
-	float sectionWidth = w / 4.0f;
-
-	float xStart = 0.0f;
-	float yBase = h; // Bottom (Amplitude 0)
-	float yPeak = 0.0f; // Top (Amplitude 1)
-
-	// Attack Phase
-	// Width = aNorm * sectionWidth
-	float xAttack = xStart + (float)(aNorm * sectionWidth);
-	float yAttack = yPeak;
-
-	// Decay Phase
-	// Width = dNorm * sectionWidth
-	// End Level = sNorm (Amplitude) -> y = h - (sNorm * h)
-	float xDecay = xAttack + (float)(dNorm * sectionWidth);
-	float ySustain = h - (float)(sNorm * h);
-
-	// Sustain Phase
-	// Fixed width of sectionWidth? Or just a small plateau?
-	// User said "Calculate the nodes...". Usually visualization shows sustain as a plateau.
-	// Let's make it fixed width for visibility.
-	float xSustain = xDecay + sectionWidth;
-
-	// Release Phase
-	// Width = rNorm * sectionWidth
-	// End Level = 0
-	float xRelease = xSustain + (float)(rNorm * sectionWidth);
-	float yEnd = yBase;
+    auto geo = getGraphGeometry();
 
 	juce::Path p;
-	p.startNewSubPath(xStart, yBase);
+	p.startNewSubPath(geo.xStart, geo.yBase);
 
-	// Attack Curve: Convex
-	// Convex usually means "bulging up/out".
-	// Start (0, H) -> End (xA, 0).
-	// Control Point at (0, 0) (Top-Left corner of the box defined by start/end) makes it bulge towards top-left.
-	// This results in a curve that rises fast and then flattens out (Logarithmic attack / "Charging").
-	// Wait, if it flattens out at the top, that's concave down?
-	// Let's verify "Convex" vs "Concave".
-	// "Convex" in envelope terms usually refers to the shape `y = x^2` (slow start, fast end) vs `y = log(x)` (fast start, slow end).
-	// `quadraticTo` with control point at corner:
-	// If control is at (0, 0) for line (0,H)->(W,0):
-	// Tangent at start is vertical up. Tangent at end is horizontal.
-	// Shape is "Fast Rise -> Slow approach". This is often called "Logarithmic" or "Exponential".
-	// The prompt asks for "Convex".
-	// If the user means "Exponential Attack" (Fast start), then (0,0) is correct.
-	// If the user means "Slow start, fast rise", then control point would be (xA, H).
-	// Standard ADSR "Attack" is usually linear or exponential (fast start).
-	// Let's assume the user wants the standard "Analog" look which is fast-start.
-	// But let's check: "Use `quadraticTo` (not `lineTo`) to make the Attack convex and the Decay/Release concave."
-	// Convex usually means the set of points below the graph is a convex set. (Bulging up).
-	// Concave usually means the set of points above the graph is a convex set. (Bulging down).
-	// So Attack Convex = Bulging Up (Fast start).
-	// Decay Concave = Bulging Down (Sagging).
-	// Release Concave = Bulging Down (Sagging).
-
-	// So:
 	// Attack Control: (xStart, yAttack) -> (0, 0).
-	p.quadraticTo(xStart, yAttack, xAttack, yAttack);
+	p.quadraticTo(geo.xStart, geo.yPeak, geo.xAttack, geo.yPeak);
 
 	// Decay Control: (xAttack, ySustain).
-	// Start (xAttack, 0). End (xDecay, ySustain).
-	// Control at (xAttack, ySustain) pulls it towards the corner.
-	// Tangent at start is vertical down. Tangent at end is horizontal.
-	// This is "Fast Drop -> Slow approach". Correct for Concave/Exponential Decay.
-	p.quadraticTo(xAttack, ySustain, xDecay, ySustain);
+	p.quadraticTo(geo.xAttack, geo.ySustain, geo.xDecay, geo.ySustain);
 
 	// Sustain Plateau
-	p.lineTo(xSustain, ySustain);
+	p.lineTo(geo.xSustain, geo.ySustain);
 
 	// Release Control: (xSustain, yEnd) -> (xSustain, H).
-	// Start (xSustain, ySustain). End (xRelease, H).
-	// Tangent start vertical down. Tangent end horizontal.
-	// Fast drop -> Slow approach. Correct.
-	p.quadraticTo(xSustain, yEnd, xRelease, yEnd);
+	p.quadraticTo(geo.xSustain, geo.yBase, geo.xRelease, geo.yBase);
 
 	// Close Path
-	p.lineTo(xRelease, h);
-	p.lineTo(xStart, h);
+	p.lineTo(geo.xRelease, geo.yBase);
+	p.lineTo(geo.xStart, geo.yBase);
 	p.closeSubPath();
+
+    // Constrain blue fill and curve drawing strictly to the top 70% graph area
+    // Actually the path is already constructed within graphHeight (geo.yBase is graphHeight)
+    // But we can add a clip just in case, or to be explicit.
+    // The instructions say "Constrain ... to the top 70% graph area".
+
+    g.saveState();
+    g.reduceClipRegion(geo.area.toNearestInt());
 
 	// Draw Fill
 	g.setColour(juce::Colour::fromString("#3d80b0").withAlpha(0.5f));
@@ -200,52 +163,158 @@ void ADSRComponent::paint(juce::Graphics& g) {
 	g.setColour(juce::Colour::fromString("#8ecae6"));
 	g.strokePath(p, juce::PathStrokeType(2.0f));
 
-	// Draw Tension Handles
-	// Calculate midpoints for Attack, Decay, Release (Quadratic Bezier t=0.5)
-	// M = 0.25*P0 + 0.5*P1 + 0.25*P2
+	// Draw Control Handles (small white circles)
 
-	// Attack Midpoint
-	// P0(xStart, yBase), P1(xStart, yAttack), P2(xAttack, yAttack)
-	float ax = 0.25f * xStart + 0.5f * xStart + 0.25f * xAttack;
-	float ay = 0.25f * yBase + 0.5f * yAttack + 0.25f * yAttack;
+    // 1. Attack Peak
+    float r = 3.0f; // Radius
+	float d = 6.0f; // Diameter
 
-	// Decay Midpoint
-	// P0(xAttack, yAttack), P1(xAttack, ySustain), P2(xDecay, ySustain)
-	float dx = 0.25f * xAttack + 0.5f * xAttack + 0.25f * xDecay;
-	float dy = 0.25f * yAttack + 0.5f * ySustain + 0.25f * ySustain;
+    g.setColour(juce::Colours::white);
 
-	// Release Midpoint
-	// P0(xSustain, ySustain), P1(xSustain, yEnd), P2(xRelease, yEnd)
-	float rx = 0.25f * xSustain + 0.5f * xSustain + 0.25f * xRelease;
-	float ry = 0.25f * ySustain + 0.5f * yEnd + 0.25f * yEnd;
+    // Attack Peak Node
+    g.fillEllipse(geo.xAttack - r, geo.yPeak - r, d, d);
 
-	float r = 2.0f; // Radius
-	float d = 4.0f; // Diameter
+    // Decay End / Sustain Start Node
+    g.fillEllipse(geo.xDecay - r, geo.ySustain - r, d, d);
 
-	g.setColour(juce::Colours::white);
-	g.fillEllipse(ax - r, ay - r, d, d);
-	g.fillEllipse(dx - r, dy - r, d, d);
-	g.fillEllipse(rx - r, ry - r, d, d);
+    // Release End Node
+    g.fillEllipse(geo.xRelease - r, geo.yBase - r, d, d);
 
-	g.setColour(juce::Colour::fromString("#8ecae6"));
-	g.drawEllipse(ax - r, ay - r, d, d, 1.0f);
-	g.drawEllipse(dx - r, dy - r, d, d, 1.0f);
-	g.drawEllipse(rx - r, ry - r, d, d, 1.0f);
+    g.restoreState();
 }
 
 void ADSRComponent::resized() {
-	GET_LOCAL_AREA(m_attack_label, "AttackLabel");
-	GET_LOCAL_AREA(m_decay_label, "DecayLabel");
-	GET_LOCAL_AREA(m_sustain_label, "SustainLabel");
-	GET_LOCAL_AREA(m_release_label, "ReleaseLabel");
+    auto bounds = getLocalBounds();
+    float w = bounds.getWidth();
+    float h = bounds.getHeight();
 
-	GET_LOCAL_AREA(m_attack, "ADSRAttack");
-	GET_LOCAL_AREA(m_decay, "ADSRDecay");
-	GET_LOCAL_AREA(m_sustain, "ADSRSustain");
-	GET_LOCAL_AREA(m_release, "ADSRRelease");
+    float graphHeight = h * 0.7f;
+    float controlsHeight = h * 0.3f;
+    float controlsY = graphHeight;
 
-	// this one was position not conforming to the grid, so we need to move it half a cell to center align it with "D"
-	GET_LOCAL_AREA(m_loop, "ADSRLoop");
-	const auto grid = ConfigFileManager::getInstance().getOptionGuiScale();
-	m_loop.setBounds(m_loop.getBounds().translated(grid / 2, 0));
+    // Position knobs
+    float knobWidth = w / 4.0f;
+    float knobSize = std::min(knobWidth, controlsHeight) * 0.8f;
+
+    // Center knobs within their sections
+    int kY = controlsY + (controlsHeight - knobSize) / 2 + 5; // Add some offset for label space?
+
+    // Using 4x4 knobs, they are usually small.
+    // Let's assume we want them centered vertically in the bottom area.
+    // And labels above or below.
+    // Let's put labels above the knobs.
+
+    int labelHeight = 15;
+    int kX_offset = (knobWidth - knobSize) / 2;
+
+    // Attack
+    m_attack_label.setBounds(0, controlsY, knobWidth, labelHeight);
+    m_attack.setBounds(kX_offset, controlsY + labelHeight, knobSize, knobSize);
+
+    // Decay
+    m_decay_label.setBounds(knobWidth, controlsY, knobWidth, labelHeight);
+    m_decay.setBounds(knobWidth + kX_offset, controlsY + labelHeight, knobSize, knobSize);
+
+    // Sustain
+    m_sustain_label.setBounds(knobWidth * 2, controlsY, knobWidth, labelHeight);
+    m_sustain.setBounds(knobWidth * 2 + kX_offset, controlsY + labelHeight, knobSize, knobSize);
+
+    // Release
+    m_release_label.setBounds(knobWidth * 3, controlsY, knobWidth, labelHeight);
+    m_release.setBounds(knobWidth * 3 + kX_offset, controlsY + labelHeight, knobSize, knobSize);
+
+    // Loop button - let's put it in the top right corner of the graph area or somewhere unobtrusive
+    // Or maybe overlay it on the graph.
+    // Previous implementation: aligned with "D".
+    // Let's put it top-right of graph for now, or maybe top-left.
+    m_loop.setBounds(w - 20, 0, 20, 20); // Small button
+}
+
+void ADSRComponent::mouseDown(const juce::MouseEvent& e) {
+    auto geo = getGraphGeometry();
+    float mx = e.position.x;
+    float my = e.position.y;
+
+    float r = 5.0f; // Hit test radius slightly larger
+
+    if (e.position.getDistanceFrom({geo.xAttack, geo.yPeak}) < r + 5.0f) {
+        m_dragged_handle = AttackPeak;
+    } else if (e.position.getDistanceFrom({geo.xDecay, geo.ySustain}) < r + 5.0f) {
+        m_dragged_handle = DecayEnd;
+    } else if (e.position.getDistanceFrom({geo.xRelease, geo.yBase}) < r + 5.0f) {
+        m_dragged_handle = ReleaseEnd;
+    } else {
+        m_dragged_handle = None;
+    }
+}
+
+void ADSRComponent::mouseDrag(const juce::MouseEvent& e) {
+    if (m_dragged_handle == None) return;
+
+    auto bounds = getLocalBounds().toFloat();
+    float w = bounds.getWidth();
+    float sectionWidth = w / 4.0f;
+    float graphHeight = bounds.getHeight() * 0.7f;
+
+    if (m_dragged_handle == AttackPeak) {
+        // Dragging Attack Peak (X-axis): Updates m_attack value.
+        // xAttack = xStart + (aNorm * sectionWidth)
+        // aNorm = (xAttack - xStart) / sectionWidth
+        float xStart = 0.0f;
+        float aNorm = (e.position.x - xStart) / sectionWidth;
+        aNorm = std::max(0.0f, std::min(1.0f, aNorm));
+
+        // Convert norm to value
+        // valueToProportionOfLength is 0..1 -> value
+        // But OdinKnob wraps Slider, so we can use standard Slider methods if range is linear?
+        // Wait, Slider::valueToProportionOfLength is value -> proportion.
+        // Slider::proportionOfLengthToValue is proportion -> value.
+        double newVal = m_attack.proportionOfLengthToValue(aNorm);
+        m_attack.setValue(newVal, juce::sendNotificationSync);
+
+    } else if (m_dragged_handle == DecayEnd) {
+        // Dragging Sustain Start (X-axis): Updates m_decay value.
+        // Dragging Sustain Start (Y-axis): Updates m_sustain value.
+
+        // X-axis
+        // xDecay = xAttack + (dNorm * sectionWidth)
+        // dNorm = (xDecay - xAttack) / sectionWidth
+        // We need current xAttack
+        double aNorm = m_attack.valueToProportionOfLength(m_attack.getValue());
+        float xAttack = 0.0f + (float)(aNorm * sectionWidth);
+
+        float dNorm = (e.position.x - xAttack) / sectionWidth;
+        dNorm = std::max(0.0f, std::min(1.0f, dNorm));
+        double newDecay = m_decay.proportionOfLengthToValue(dNorm);
+        m_decay.setValue(newDecay, juce::sendNotificationSync);
+
+        // Y-axis
+        // ySustain = graphHeight - (sNorm * graphHeight)
+        // sNorm = (graphHeight - ySustain) / graphHeight
+        float sNorm = (graphHeight - e.position.y) / graphHeight;
+        sNorm = std::max(0.0f, std::min(1.0f, sNorm));
+        double newSustain = m_sustain.proportionOfLengthToValue(sNorm);
+        m_sustain.setValue(newSustain, juce::sendNotificationSync);
+
+    } else if (m_dragged_handle == ReleaseEnd) {
+        // Dragging Release End (X-axis): Updates m_release value.
+        // xRelease = xSustain + (rNorm * sectionWidth)
+        // We need current xSustain
+        // xSustain = xDecay + sectionWidth
+        double aNorm = m_attack.valueToProportionOfLength(m_attack.getValue());
+        double dNorm = m_decay.valueToProportionOfLength(m_decay.getValue());
+        float xAttack = (float)(aNorm * sectionWidth);
+        float xDecay = xAttack + (float)(dNorm * sectionWidth);
+        float xSustain = xDecay + sectionWidth;
+
+        float rNorm = (e.position.x - xSustain) / sectionWidth;
+        rNorm = std::max(0.0f, std::min(1.0f, rNorm));
+        double newRelease = m_release.proportionOfLengthToValue(rNorm);
+        m_release.setValue(newRelease, juce::sendNotificationSync);
+    }
+    repaint();
+}
+
+void ADSRComponent::mouseUp(const juce::MouseEvent& e) {
+    m_dragged_handle = None;
 }

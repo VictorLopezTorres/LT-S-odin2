@@ -16,7 +16,7 @@
 #pragma once
 
 #include "../JuceLibraryCode/JuceHeader.h"
-#include "DrawableSlider.h"
+#include "OdinKnob.h"
 #include "OdinButton.h"
 #include "OdinControlAttachments.h"
 #include "TextLabel.h"
@@ -51,6 +51,10 @@ public:
 	void paint(juce::Graphics& g) override;
 	void resized() override;
 
+    void mouseDown(const juce::MouseEvent& e) override;
+    void mouseDrag(const juce::MouseEvent& e) override;
+    void mouseUp(const juce::MouseEvent& e) override;
+
 private:
     TextLabel m_attack_label;
     TextLabel m_decay_label;
@@ -58,20 +62,43 @@ private:
     TextLabel m_release_label;
 
 	OdinButton m_loop;
-	DrawableSlider m_attack;
-	DrawableSlider m_decay;
-	DrawableSlider m_sustain;
-	DrawableSlider m_release;
+	OdinKnob m_attack;
+	OdinKnob m_decay;
+	OdinKnob m_sustain;
+	OdinKnob m_release;
 
 	std::string m_adsr_number;
 	AudioProcessorValueTreeState &m_value_tree;
 
-	std::unique_ptr<OdinSliderAttachment> m_attack_attach;
-	std::unique_ptr<OdinSliderAttachment> m_decay_attach;
-	std::unique_ptr<OdinSliderAttachment> m_sustain_attach;
-	std::unique_ptr<OdinSliderAttachment> m_release_attach;
+	std::unique_ptr<OdinKnobAttachment> m_attack_attach;
+	std::unique_ptr<OdinKnobAttachment> m_decay_attach;
+	std::unique_ptr<OdinKnobAttachment> m_sustain_attach;
+	std::unique_ptr<OdinKnobAttachment> m_release_attach;
 
 	std::unique_ptr<OdinButtonAttachment> m_loop_attach;
+
+    // Interaction state
+    enum DragHandle {
+        None = -1,
+        AttackPeak = 0,
+        DecayEnd = 1,
+        ReleaseEnd = 2
+    };
+    DragHandle m_dragged_handle = None;
+
+    // Helper methods for geometry
+    struct GraphGeometry {
+        juce::Rectangle<float> area;
+        float xStart;
+        float xAttack;
+        float xDecay;
+        float xSustain; // Start of release
+        float xRelease;
+        float yBase;
+        float yPeak;
+        float ySustain;
+    };
+    GraphGeometry getGraphGeometry();
 
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ADSRComponent)
 };
