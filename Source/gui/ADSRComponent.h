@@ -48,6 +48,7 @@ public:
 	ADSRComponent(AudioProcessorValueTreeState &vts, const std::string &p_adsr_number);
 	~ADSRComponent();
 
+	void paint(juce::Graphics& g) override;
 	void resized() override;
 
 private:
