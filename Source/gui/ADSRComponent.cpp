@@ -134,7 +134,7 @@ ADSRComponent::GraphGeometry ADSRComponent::getGraphGeometry() {
 }
 
 void ADSRComponent::paint(juce::Graphics& g) {
-	g.fillAll(juce::Colour::fromString("#212121"));
+	g.fillAll(juce::Colour::fromString("#1f1f1f"));
     auto geo = getGraphGeometry();
 
 	juce::Path p;
@@ -191,6 +191,34 @@ void ADSRComponent::paint(juce::Graphics& g) {
     g.fillEllipse(geo.xRelease - r, geo.yBase - r, d, d);
 
     g.restoreState();
+
+    if (m_activeParameterIndex != -1) {
+        g.setColour(juce::Colours::white);
+        g.setFont(14.0f);
+
+        juce::String text;
+        float x = 0, y = 0;
+
+        if (m_activeParameterIndex == 0) { // Attack
+            text = m_attack.getTextFromValue(m_attack.getValue());
+            x = geo.xAttack;
+            y = geo.yPeak + 20;
+        } else if (m_activeParameterIndex == 1) { // Decay
+            text = m_decay.getTextFromValue(m_decay.getValue());
+            x = geo.xDecay;
+            y = (geo.ySustain < 30) ? geo.ySustain + 20 : geo.ySustain - 20;
+        } else if (m_activeParameterIndex == 2) { // Sustain
+            text = m_sustain.getTextFromValue(m_sustain.getValue());
+            x = geo.xDecay;
+            y = (geo.ySustain < 30) ? geo.ySustain + 20 : geo.ySustain - 20;
+        } else if (m_activeParameterIndex == 3) { // Release
+            text = m_release.getTextFromValue(m_release.getValue());
+            x = geo.xRelease;
+            y = geo.yBase - 20;
+        }
+
+        g.drawText(text, x - 30, y - 10, 60, 20, juce::Justification::centred);
+    }
 }
 
 void ADSRComponent::resized() {
@@ -256,10 +284,29 @@ void ADSRComponent::mouseDown(const juce::MouseEvent& e) {
     } else {
         m_dragged_handle = None;
     }
+
+    if (m_dragged_handle == AttackPeak) {
+        m_activeParameterIndex = 0;
+    } else if (m_dragged_handle == DecayEnd) {
+        m_activeParameterIndex = 2; // Default to Sustain
+    } else if (m_dragged_handle == ReleaseEnd) {
+        m_activeParameterIndex = 3;
+    } else {
+        m_activeParameterIndex = -1;
+    }
 }
 
 void ADSRComponent::mouseDrag(const juce::MouseEvent& e) {
     if (m_dragged_handle == None) return;
+
+    if (m_dragged_handle == DecayEnd) {
+        juce::Point<float> startPos = e.getMouseDownPosition().toFloat();
+        if (std::abs(e.position.x - startPos.x) > std::abs(e.position.y - startPos.y)) {
+             m_activeParameterIndex = 1; // Decay
+        } else {
+             m_activeParameterIndex = 2; // Sustain
+        }
+    }
 
     auto bounds = getLocalBounds().toFloat();
     float w = bounds.getWidth();
@@ -327,4 +374,11 @@ void ADSRComponent::mouseDrag(const juce::MouseEvent& e) {
 
 void ADSRComponent::mouseUp(const juce::MouseEvent& e) {
     m_dragged_handle = None;
+    m_activeParameterIndex = -1;
+    repaint();
+}
+
+void ADSRComponent::mouseExit(const juce::MouseEvent& e) {
+    m_activeParameterIndex = -1;
+    repaint();
 }
